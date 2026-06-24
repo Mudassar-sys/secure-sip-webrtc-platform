@@ -127,7 +127,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./web/index.html:/usr/share/caddy/index.html:ro
+      - ./web:/usr/share/caddy:ro
       - ./web/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config

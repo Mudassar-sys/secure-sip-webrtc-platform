@@ -1,0 +1,5 @@
+# Dispatcher destination list
+# Format: setid destination flags priority attributes description
+# Set 1: Asterisk call engine pool
+# Update with actual Asterisk container hostname/IP
+1 sip:asterisk:5060 0 10 attrs=transport=tcp Asterisk-1

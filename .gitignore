@@ -1,0 +1,13 @@
+stack/.env
+stack/certs/fullchain.pem
+stack/certs/privkey.pem
+.claude/
+*.zip
+implant-dentistry*/
+arcgis-demo*/
+avatar-pipeline/
+kitchenpal-port-sample/
+HS-EO-Review/
+MIRRA-WIN-PACK/
+CrewNexa-WP-Hack-Recovery-Speed-OnePager.html
+index.html

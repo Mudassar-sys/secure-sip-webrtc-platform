@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure SIP &amp; WebRTC Platform - Architecture &amp; PoC</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0e1a;
+  --bg2:#0f1629;
+  --bg3:#151d35;
+  --border:#1e2d50;
+  --border2:#253660;
+  --accent:#2563eb;
+  --accent2:#3b82f6;
+  --accent3:#60a5fa;
+  --green:#10b981;
+  --green2:#059669;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --purple:#8b5cf6;
+  --cyan:#06b6d4;
+  --text:#e2e8f0;
+  --text2:#94a3b8;
+  --text3:#64748b;
+  --public:#ef444422;
+  --public-border:#ef4444;
+  --private:#10b98111;
+  --private-border:#10b981;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(10,14,26,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 2rem;gap:0}
+.nav-logo{font-size:.85rem;font-weight:700;color:var(--accent3);letter-spacing:.15em;text-transform:uppercase;padding:1rem 0;margin-right:2rem;white-space:nowrap}
+.nav-tabs{display:flex;gap:0;flex:1}
+.nav-tab{padding:.85rem 1.5rem;font-size:.85rem;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;background:none;border-top:none;border-left:none;border-right:none}
+.nav-tab:hover{color:var(--text)}
+.nav-tab.active{color:var(--accent3);border-bottom-color:var(--accent)}
+
+/* SECTIONS */
+.section{display:none;min-height:calc(100vh - 53px)}
+.section.active{display:block}
+
+/* HERO */
+.hero{padding:3rem 2rem 2rem;max-width:1400px;margin:0 auto}
+.hero h1{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:700;color:#fff;line-height:1.2;margin-bottom:.5rem}
+.hero p{color:var(--text2);font-size:.95rem;max-width:700px}
+.badge-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem}
+.badge{display:inline-flex;align-items:center;gap:.4rem;padding:.3rem .8rem;border-radius:20px;font-size:.75rem;font-weight:600;letter-spacing:.05em}
+.badge-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.badge-blue{background:rgba(37,99,235,.15);color:var(--accent3);border:1px solid rgba(37,99,235,.3)}
+.badge-purple{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
+
+/* ARCH DIAGRAM */
+.arch-wrap{max-width:1400px;margin:0 auto;padding:0 2rem 3rem;display:grid;grid-template-columns:1fr 380px;gap:2rem}
+@media(max-width:900px){.arch-wrap{grid-template-columns:1fr}}
+
+.layers-col{display:flex;flex-direction:column;gap:0}
+
+.layer-zone{position:relative;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1rem;border:1px solid var(--border)}
+.layer-zone.public{background:var(--public);border-color:var(--public-border)}
+.layer-zone.private{background:var(--private);border-color:var(--private-border)}
+.zone-label{position:absolute;top:-11px;left:1rem;font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .7rem;border-radius:4px}
+.zone-label.pub{background:var(--red);color:#fff}
+.zone-label.priv{background:var(--green2);color:#fff}
+
+.layer-header{display:flex;align-items:center;gap:.8rem;margin-bottom:.8rem}
+.layer-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;flex-shrink:0}
+.layer-title{font-size:.95rem;font-weight:700;color:#fff}
+.layer-sub{font-size:.75rem;color:var(--text2);margin-top:.1rem}
+
+.components{display:flex;flex-wrap:wrap;gap:.6rem}
+.comp-box{padding:.5rem .9rem;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid;display:flex;align-items:center;gap:.4rem;position:relative}
+.comp-box:hover{transform:translateY(-2px);filter:brightness(1.2)}
+.comp-box.selected{ring:2px solid white}
+
+/* color variants */
+.cb-red{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4);color:#fca5a5}
+.cb-blue{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.4);color:#93c5fd}
+.cb-green{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.4);color:#6ee7b7}
+.cb-purple{background:rgba(139,92,246,.1);border-color:rgba(139,92,246,.4);color:#c4b5fd}
+.cb-cyan{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.4);color:#67e8f9}
+.cb-yellow{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4);color:#fcd34d}
+.cb-orange{background:rgba(249,115,22,.1);border-color:rgba(249,115,22,.4);color:#fdba74}
+
+/* connector arrows */
+.connector{display:flex;align-items:center;justify-content:center;height:28px;position:relative;margin:-4px 0}
+.connector-line{width:2px;height:100%;background:linear-gradient(to bottom,var(--border2),var(--accent));position:absolute}
+.connector-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);position:absolute;animation:pulse-dot 2s infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.3)}}
+
+.flow-split{display:flex;gap:1rem;margin-top:.5rem}
+.split-line{display:flex;flex-direction:column;align-items:center;flex:1;gap:.5rem}
+.split-label{font-size:.7rem;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+
+/* client endpoints */
+.clients-row{display:flex;flex-wrap:wrap;gap:.7rem;padding:1.5rem 0 .5rem;justify-content:center}
+.client-pill{display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:.7rem 1rem;border-radius:10px;background:var(--bg3);border:1px solid var(--border2);font-size:.72rem;color:var(--text2);cursor:default;min-width:80px;text-align:center}
+.client-icon{font-size:1.4rem}
+
+/* detail panel */
+.detail-panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem;position:sticky;top:70px;max-height:calc(100vh - 90px);overflow-y:auto}
+.detail-panel h3{font-size:1rem;font-weight:700;color:#fff;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.detail-section{margin-bottom:1.2rem}
+.detail-section h4{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:.4rem}
+.detail-section p,.detail-section li{font-size:.82rem;color:var(--text2);line-height:1.55}
+.detail-section ul{list-style:none;padding:0}
+.detail-section li::before{content:"- ";color:var(--accent3)}
+.detail-alt{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:.6rem .8rem;font-size:.8rem;color:#fca5a5;margin-top:.4rem}
+.detail-placeholder{color:var(--text3);font-size:.85rem;text-align:center;padding:2rem 0}
+
+/* animate flow path */
+.flow-anim{position:relative}
+.moving-dot{width:6px;height:6px;border-radius:50%;background:var(--accent3);position:absolute;top:0;left:50%;transform:translateX(-50%);animation:move-down 3s linear infinite}
+@keyframes move-down{0%{top:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{top:100%;opacity:0}}
+
+/* ===== SECTION 2: RATIONALE ===== */
+.rationale-wrap{max-width:1200px;margin:0 auto;padding:2rem}
+.section-title{font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:.4rem}
+.section-sub{color:var(--text2);font-size:.9rem;margin-bottom:2rem}
+
+/* comparison table */
+.comp-table-wrap{overflow-x:auto;margin-bottom:3rem}
+table{width:100%;border-collapse:collapse;font-size:.83rem}
+thead tr{background:var(--bg3)}
+th{padding:.75rem 1rem;text-align:left;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);border-bottom:1px solid var(--border)}
+td{padding:.75rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,.02)}
+.td-our{color:var(--green);font-weight:600}
+.td-bad{color:#fca5a5}
+.td-mid{color:var(--yellow)}
+.approach-col{font-weight:600;color:#fff;white-space:nowrap}
+.winner-badge{display:inline-flex;align-items:center;gap:.3rem;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:var(--green);border-radius:4px;padding:.15rem .5rem;font-size:.68rem;font-weight:700;margin-left:.5rem}
+
+/* threat grid */
+.threat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem}
+.threat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex}
+.threat-left{width:4px;flex-shrink:0}
+.threat-left.high{background:var(--red)}
+.threat-left.med{background:var(--yellow)}
+.threat-body{padding:.9rem 1rem;flex:1}
+.threat-name{font-size:.8rem;font-weight:700;color:#fff;margin-bottom:.3rem}
+.threat-desc{font-size:.75rem;color:var(--text2);margin-bottom:.5rem}
+.threat-mitigation{font-size:.75rem;color:var(--green);display:flex;align-items:flex-start;gap:.4rem}
+.threat-mitigation::before{content:"CONTROL:";font-size:.65rem;font-weight:700;color:var(--green2);white-space:nowrap;padding-top:.05rem}
+
+/* ===== SECTION 3: POC ===== */
+.poc-wrap{max-width:1200px;margin:0 auto;padding:2rem;display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+@media(max-width:800px){.poc-wrap{grid-template-columns:1fr}}
+
+.phone-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.phone-header{background:var(--bg3);padding:1rem 1.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.7rem}
+.phone-header h3{font-size:.9rem;font-weight:700;color:#fff}
+.phone-status-dot{width:8px;height:8px;border-radius:50%;background:var(--text3)}
+.phone-status-dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.phone-status-dot.yellow{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.phone-body{padding:1.4rem}
+
+.form-row{margin-bottom:.9rem}
+.form-label{font-size:.72rem;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem;display:block}
+.form-input{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:.55rem .8rem;color:var(--text);font-size:.83rem;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--accent)}
+.form-input:disabled{opacity:.5;cursor:not-allowed}
+
+.status-pills{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}
+.pill{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .75rem;border-radius:20px;font-size:.72rem;font-weight:600;border:1px solid;transition:all .4s}
+.pill-off{background:rgba(100,116,139,.1);border-color:var(--text3);color:var(--text3)}
+.pill-on{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:var(--green)}
+.pill-busy{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.4);color:var(--yellow)}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+.btn-row{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+.btn{padding:.6rem 1.2rem;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;transition:all .2s;display:flex;align-items:center;gap:.4rem}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent2)}
+.btn-green{background:var(--green2);color:#fff}
+.btn-green:hover:not(:disabled){background:var(--green)}
+.btn-red{background:rgba(239,68,68,.8);color:#fff}
+.btn-red:hover:not(:disabled){background:var(--red)}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-outline:hover:not(:disabled){border-color:var(--accent3);color:var(--accent3)}
+
+.call-display{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1.2rem;text-align:center;margin:.8rem 0}
+.call-display .callee{font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:.2rem}
+.call-display .call-state{font-size:.8rem;color:var(--text2)}
+.call-timer{font-size:1.4rem;font-weight:700;font-family:monospace;color:var(--green);margin-top:.4rem;display:none}
+
+/* security panel */
+.sec-panel{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.sec-header{background:var(--bg3);padding:1rem 1.4rem;border-bottom:1px solid var(--border)}
+.sec-header h3{font-size:.9rem;font-weight:700;color:#fff;margin-bottom:.2rem}
+.sec-header p{font-size:.73rem;color:var(--text3)}
+.attack-btns{padding:1rem 1.4rem;display:grid;grid-template-columns:1fr 1fr;gap:.6rem;border-bottom:1px solid var(--border)}
+.btn-attack{padding:.6rem .9rem;border-radius:8px;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid;transition:all .2s;text-align:center;background:transparent}
+.btn-attack.flood{border-color:rgba(239,68,68,.4);color:#fca5a5}
+.btn-attack.flood:hover{background:rgba(239,68,68,.1)}
+.btn-attack.reg{border-color:rgba(245,158,11,.4);color:#fcd34d}
+.btn-attack.reg:hover{background:rgba(245,158,11,.1)}
+.btn-attack.enum{border-color:rgba(139,92,246,.4);color:#c4b5fd}
+.btn-attack.enum:hover{background:rgba(139,92,246,.1)}
+.btn-attack.fraud{border-color:rgba(6,182,212,.4);color:#67e8f9}
+.btn-attack.fraud:hover{background:rgba(6,182,212,.1)}
+.btn-attack:disabled{opacity:.4;cursor:not-allowed}
+
+.log-box{height:320px;overflow-y:auto;padding:1rem 1.4rem;font-family:monospace;font-size:.75rem;display:flex;flex-direction:column;gap:.2rem;background:var(--bg)}
+.log-entry{display:flex;gap:.7rem;animation:log-in .2s ease}
+@keyframes log-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.log-time{color:var(--text3);flex-shrink:0}
+.log-src{color:var(--accent3);flex-shrink:0}
+.log-msg{color:var(--text2)}
+.log-block{color:var(--red)}
+.log-allow{color:var(--green)}
+.log-warn{color:var(--yellow)}
+.log-info{color:var(--cyan)}
+.log-disclaimer{font-size:.7rem;color:var(--text3);padding:.6rem 1.4rem 1rem;font-style:italic;border-top:1px solid var(--border)}
+
+/* ===== SECTION 4: ENGAGEMENT ===== */
+.eng-wrap{max-width:900px;margin:0 auto;padding:2rem}
+.phase-cards{display:grid;gap:1.5rem;margin-top:1.5rem}
+.phase-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex}
+.phase-side{width:5px;flex-shrink:0}
+.phase-body{padding:1.4rem 1.6rem;flex:1}
+.phase-num{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:.3rem}
+.phase-title{font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:.8rem}
+.outcome-list{list-style:none;display:flex;flex-direction:column;gap:.5rem}
+.outcome-list li{font-size:.83rem;color:var(--text2);display:flex;align-items:flex-start;gap:.6rem;line-height:1.5}
+.outcome-list li::before{content:"";width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:.45rem}
+.phase-1 .phase-side{background:var(--accent)}
+.phase-1 .outcome-list li::before{background:var(--accent3)}
+.phase-2 .phase-side{background:var(--purple)}
+.phase-2 .outcome-list li::before{background:#a78bfa}
+.phase-3 .phase-side{background:var(--green2)}
+.phase-3 .outcome-list li::before{background:var(--green)}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">SecureSIP Platform</div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('arch',this)">Architecture Flow</button>
+    <button class="nav-tab" onclick="showSection('rationale',this)">Design Rationale</button>
+    <button class="nav-tab" onclick="showSection('poc',this)">WebRTC PoC</button>
+    <button class="nav-tab" onclick="showSection('engagement',this)">Engagement</button>
+  </div>
+</nav>
+
+<!-- ===================== SECTION 1: ARCH ===================== -->
+<div id="arch" class="section active">
+  <div class="hero">
+    <h1>Secure SIP &amp; WebRTC Platform Architecture</h1>
+    <p>Five-layer hardened reference design - Kamailio-fronted, media-separated, and fraud-resistant by default. Click any component to explore the design decision behind it.</p>
+    <div class="badge-row">
+      <span class="badge badge-red" style="background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.3)">Internet-facing edge isolated</span>
+      <span class="badge badge-green">Private media plane</span>
+      <span class="badge badge-blue">Horizontal scale at every layer</span>
+      <span class="badge badge-purple">End-to-end encryption</span>
+    </div>
+  </div>
+
+  <div class="arch-wrap">
+    <div class="layers-col">
+
+      <!-- Clients -->
+      <div class="clients-row">
+        <div class="client-pill"><span class="client-icon">🌐</span>Browser<br>WebRTC</div>
+        <div class="client-pill"><span class="client-icon">💻</span>Softphone<br>TLS/SRTP</div>
+        <div class="client-pill"><span class="client-icon">📱</span>Mobile<br>VoIP App</div>
+        <div class="client-pill"><span class="client-icon">📞</span>SIP<br>Extension</div>
+        <div class="client-pill"><span class="client-icon">🔌</span>Carrier<br>SIP Trunk</div>
+      </div>
+
+      <div class="connector flow-anim" style="height:32px">
+        <div class="connector-line"></div>
+        <div class="moving-dot"></div>
+      </div>
+
+      <!-- Layer 1 -->
+      <div class="layer-zone public" style="margin-top:0">
+        <span class="zone-label pub">PUBLIC INTERNET EDGE - only layer exposed</span>
+        <div class="layer-header" style="margin-top:.5rem">
+          <div class="layer-num" style="background:rgba(239,68,68,.3);color:#fca5a5">1</div>
+          <div>
+            <div class="layer-title">Internet-Facing Edge - SBC &amp; DDoS Absorption</div>
+            <div class="layer-sub">Anycast scrubbing optional in front - handles all inbound SIP over UDP / TCP / TLS / WSS</div>
+          </div>
+        </div>
+        <div class="components">
+          <div class="comp-box cb-red" onclick="showDetail('kamailio-sbc')">🛡 Kamailio SBC</div>
+          <div class="comp-box cb-red" onclick="showDetail('pike')">⚡ pike anti-flood</div>
+          <div class="comp-box cb-red" onclick="showDetail('htable')">🚫 htable IP ban</div>
+          <div class="comp-box cb-red" onclick="showDetail('tls-wss')">🔒 TLS/WSS termination</div>
+          <div class="comp-box cb-red" onclick="showDetail('topology')">🕵 Topology hiding</div>
+          <div class="comp-box cb-red" onclick="showDetail('geoip')">🌍 Geo/ACL filter</div>
+          <div class="comp-box cb-red" onclick="showDetail('ratelimit')">📊 Rate limiting</div>
+          <div class="comp-box cb-red" onclick="showDetail('anycast')">☁ Anycast scrubbing</div>
+        </div>
+      </div>
+
+      <div class="connector flow-anim" style="height:32px">
+        <div class="connector-line" style="background:linear-gradient(to bottom,var(--border2),var(--green))"></div>
+        <div class="moving-dot" style="animation-delay:1s"></div>
+      </div>
+
+      <!-- Layer 2 -->
+      <div class="layer-zone private">
+        <span class="zone-label priv">PRIVATE - no direct internet access</span>
+        <div class="layer-header" style="margin-top:.5rem">
+          <div class="layer-num" style="background:rgba(16,185,129,.2);color:var(--green)">2</div>
+          <div>
+            <div class="layer-title">Media Relay - RTPengine &amp; STUN/TURN</div>
+            <div class="layer-sub">No client talks directly to the call engine - all media anchored here</div>
+          </div>
+        </div>
+        <div class="components">
+          <div class="comp-box cb-green" onclick="showDetail('rtpengine')">🎙 RTPengine</div>
+          <div class="comp-box cb-green" onclick="showDetail('dtls-srtp')">🔐 DTLS-SRTP bridge</div>
+          <div class="comp-box cb-green" onclick="showDetail('ice')">🧊 ICE negotiation</div>
+          <div class="comp-box cb-green" onclick="showDetail('coturn')">↩ coturn STUN/TURN</div>
+          <div class="comp-box cb-green" onclick="showDetail('media-anchor')">⚓ Media anchoring</div>
+        </div>
+      </div>
+
+      <div class="connector flow-anim" style="height:32px">
+        <div class="connector-line" style="background:linear-gradient(to bottom,var(--green),var(--purple))"></div>
+        <div class="moving-dot" style="background:var(--purple);animation-delay:.5s"></div>
+      </div>
+
+      <!-- Layer 3 -->
+      <div class="layer-zone private">
+        <span class="zone-label priv">PRIVATE</span>
+        <div class="layer-header" style="margin-top:.5rem">
+          <div class="layer-num" style="background:rgba(139,92,246,.2);color:#c4b5fd">3</div>
+          <div>
+            <div class="layer-title">Application / Call Engine - Asterisk PJSIP</div>
+            <div class="layer-sub">IVR, queues, bridging, recording - TLS and SRTP only - per-tenant dialplan fraud guards</div>
+          </div>
+        </div>
+        <div class="components">
+          <div class="comp-box cb-purple" onclick="showDetail('asterisk')">⚙ Asterisk PJSIP</div>
+          <div class="comp-box cb-purple" onclick="showDetail('per-tenant')">🏢 Per-tenant contexts</div>
+          <div class="comp-box cb-purple" onclick="showDetail('dialplan-fraud')">🔑 Dialplan fraud guards</div>
+          <div class="comp-box cb-purple" onclick="showDetail('recording')">🎬 Secure recording</div>
+          <div class="comp-box cb-purple" onclick="showDetail('ivr')">📋 IVR / ACD queues</div>
+        </div>
+      </div>
+
+      <div class="connector flow-anim" style="height:32px">
+        <div class="connector-line" style="background:linear-gradient(to bottom,var(--purple),var(--cyan))"></div>
+        <div class="moving-dot" style="background:var(--cyan);animation-delay:1.5s"></div>
+      </div>
+
+      <!-- Layer 4 -->
+      <div class="layer-zone private">
+        <span class="zone-label priv">PRIVATE</span>
+        <div class="layer-header" style="margin-top:.5rem">
+          <div class="layer-num" style="background:rgba(6,182,212,.2);color:var(--cyan)">4</div>
+          <div>
+            <div class="layer-title">Routing, Data &amp; Trunks</div>
+            <div class="layer-sub">Kamailio dispatcher, carrier trunks, subscriber DB, Redis shared state, STIR/SHAKEN</div>
+          </div>
+        </div>
+        <div class="components">
+          <div class="comp-box cb-cyan" onclick="showDetail('dispatcher')">⚖ Kamailio dispatcher</div>
+          <div class="comp-box cb-cyan" onclick="showDetail('subscriber-db')">🗄 Subscriber DB</div>
+          <div class="comp-box cb-cyan" onclick="showDetail('redis')">📡 Redis shared state</div>
+          <div class="comp-box cb-cyan" onclick="showDetail('carrier-trunks')">🔌 Carrier trunks TLS</div>
+          <div class="comp-box cb-cyan" onclick="showDetail('stir')">✍ STIR/SHAKEN</div>
+          <div class="comp-box cb-cyan" onclick="showDetail('lcr')">🗺 LCR engine</div>
+        </div>
+      </div>
+
+      <div class="connector flow-anim" style="height:32px">
+        <div class="connector-line" style="background:linear-gradient(to bottom,var(--cyan),var(--yellow))"></div>
+        <div class="moving-dot" style="background:var(--yellow);animation-delay:2s"></div>
+      </div>
+
+      <!-- Layer 5 -->
+      <div class="layer-zone private">
+        <span class="zone-label priv">PRIVATE</span>
+        <div class="layer-header" style="margin-top:.5rem">
+          <div class="layer-num" style="background:rgba(245,158,11,.2);color:var(--yellow)">5</div>
+          <div>
+            <div class="layer-title">Observability &amp; Control Plane</div>
+            <div class="layer-sub">Full SIP capture, real-time fraud analytics, metrics, alerting</div>
+          </div>
+        </div>
+        <div class="components">
+          <div class="comp-box cb-yellow" onclick="showDetail('homer')">📊 Homer/HEP SIP capture</div>
+          <div class="comp-box cb-yellow" onclick="showDetail('prometheus')">📈 Prometheus + Grafana</div>
+          <div class="comp-box cb-yellow" onclick="showDetail('fail2ban')">🚧 fail2ban firewall sync</div>
+          <div class="comp-box cb-yellow" onclick="showDetail('cdr')">📋 CDR + fraud analytics</div>
+          <div class="comp-box cb-yellow" onclick="showDetail('alerting')">🔔 Spike / storm alerting</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Detail panel -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="detail-placeholder">
+        <div style="font-size:2rem;margin-bottom:.8rem">🖱</div>
+        <div>Click any component to see the design decision, rationale, and market alternatives.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SECTION 2: RATIONALE ===================== -->
+<div id="rationale" class="section">
+  <div class="rationale-wrap">
+    <div class="section-title">Design Rationale &amp; Market Comparison</div>
+    <div class="section-sub">Why a layered Kamailio-fronted architecture wins on security and scale against common market approaches.</div>
+
+    <div class="comp-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Approach</th>
+            <th>Security posture</th>
+            <th>Scale &amp; HA</th>
+            <th>Operational complexity</th>
+            <th>Fraud protection</th>
+            <th>WebRTC support</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="approach-col">Layered Kamailio + RTPengine + Asterisk <span class="winner-badge">✓ Our choice</span></td>
+            <td class="td-our">Edge absorbs floods before reaching call engine. TLS/SRTP throughout. Topology hidden.</td>
+            <td class="td-our">Stateless edge scales horizontally behind anycast. Asterisk pool behind dispatcher.</td>
+            <td class="td-mid">Higher initial setup - offset by infrastructure-as-code and clear layer separation.</td>
+            <td class="td-our">Per-account caps, destination allow-lists, velocity limits, auto-suspend at dialplan level.</td>
+            <td class="td-our">RTPengine bridges DTLS-SRTP natively. WSS at edge. No additional gateway needed.</td>
+          </tr>
+          <tr>
+            <td class="approach-col">Asterisk / FreePBX direct on public IP</td>
+            <td class="td-bad">Asterisk exposed to internet. All attacks hit the B2BUA directly. High SIP scanning exposure.</td>
+            <td class="td-bad">Single point of failure. Asterisk under flood will exhaust threads and drop calls.</td>
+            <td class="td-our">Simple single-host setup.</td>
+            <td class="td-mid">Basic dialplan guards only. No edge filtering.</td>
+            <td class="td-mid">Limited. Requires additional WebRTC proxy configuration.</td>
+          </tr>
+          <tr>
+            <td class="approach-col">Single-box commercial PBX</td>
+            <td class="td-bad">Vendor-managed hardening. Limited visibility. Proprietary SBC often shared.</td>
+            <td class="td-bad">Vertical scaling only. No horizontal elasticity.</td>
+            <td class="td-our">Low - vendor managed.</td>
+            <td class="td-mid">Basic built-in rules. No custom dialplan fraud logic.</td>
+            <td class="td-mid">Vendor-dependent. Often licensed as extra module.</td>
+          </tr>
+          <tr>
+            <td class="approach-col">Generic proprietary SBC only</td>
+            <td class="td-mid">Good edge protection but no visibility into call logic fraud.</td>
+            <td class="td-mid">SBC scales but backend not specified.</td>
+            <td class="td-bad">Vendor lock-in. Custom rules require professional services contracts.</td>
+            <td class="td-bad">Toll fraud happens in the call engine - SBC alone cannot block mid-call fraud.</td>
+            <td class="td-mid">Depends on vendor edition.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title" style="font-size:1.1rem;margin-bottom:.4rem">Security by Design - Threat Control Matrix</div>
+    <div class="section-sub">Every known attack vector addressed at the correct layer.</div>
+
+    <div class="threat-grid">
+      <div class="threat-card">
+        <div class="threat-left high"></div>
+        <div class="threat-body">
+          <div class="threat-name">Volumetric SIP DDoS</div>
+          <div class="threat-desc">Millions of UDP/TCP packets overwhelming the signaling stack.</div>
+          <div class="threat-mitigation">Optional anycast scrubbing upstream; UDP rate caps and connection limits at Kamailio edge before parsing.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left high"></div>
+        <div class="threat-body">
+          <div class="threat-name">SIP Flood / Scanning</div>
+          <div class="threat-desc">High-rate INVITE or OPTIONS floods from botnets scanning for open SIP endpoints.</div>
+          <div class="threat-mitigation">Kamailio pike module auto-bans IPs exceeding req/s threshold; entries written to htable; fail2ban drops at iptables.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left high"></div>
+        <div class="threat-body">
+          <div class="threat-name">Registration Attacks</div>
+          <div class="threat-desc">Automated REGISTER floods targeting authentication endpoints to brute-force credentials.</div>
+          <div class="threat-mitigation">Per-IP and per-AOR registration throttle; digest auth challenge; short ban windows on repeated failures.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left med"></div>
+        <div class="threat-body">
+          <div class="threat-name">Extension Enumeration</div>
+          <div class="threat-desc">Attackers probe for valid extensions by analyzing 404 vs 401 response codes.</div>
+          <div class="threat-mitigation">Uniform 401 Unauthorized returned for all extensions (valid and invalid); scanner User-Agent patterns blocked at edge.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left high"></div>
+        <div class="threat-body">
+          <div class="threat-name">Brute Force Auth</div>
+          <div class="threat-desc">Credential stuffing against known extension ranges using leaked password lists.</div>
+          <div class="threat-mitigation">htable failed-auth counter with escalating ban windows; fail2ban syncs block to OS firewall; per-account lockout.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left high"></div>
+        <div class="threat-body">
+          <div class="threat-name">Toll Fraud</div>
+          <div class="threat-desc">Compromised extension dials premium international numbers generating large charges.</div>
+          <div class="threat-mitigation">Per-account concurrent call caps; destination allow-lists; high-risk prefix blacklist; velocity limits; auto-suspend on anomaly.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left med"></div>
+        <div class="threat-body">
+          <div class="threat-name">RTP / Media Injection</div>
+          <div class="threat-desc">Attacker injects forged RTP packets to hijack or disrupt active calls.</div>
+          <div class="threat-mitigation">RTPengine anchors all media; strict source IP/port validation; SRTP-only on all legs; media ports firewalled except via anchored flows.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left med"></div>
+        <div class="threat-body">
+          <div class="threat-name">Eavesdropping</div>
+          <div class="threat-desc">Passive interception of SIP signaling or RTP media on untrusted networks.</div>
+          <div class="threat-mitigation">TLS for all SIP signaling; WSS for browser clients; SRTP for all media legs; DTLS-SRTP for WebRTC; zero cleartext on public side.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left med"></div>
+        <div class="threat-body">
+          <div class="threat-name">Topology Disclosure</div>
+          <div class="threat-desc">SIP Via / Record-Route headers expose internal IP addresses to external parties.</div>
+          <div class="threat-mitigation">Kamailio topology hiding module rewrites all headers; internal IPs never visible to endpoints or carriers.</div>
+        </div>
+      </div>
+      <div class="threat-card">
+        <div class="threat-left med"></div>
+        <div class="threat-body">
+          <div class="threat-name">Geographic Abuse</div>
+          <div class="threat-desc">Traffic originating from regions where the platform has no legitimate users.</div>
+          <div class="threat-mitigation">Geo-IP and ACL filtering at edge; only operating regions whitelisted; all other sources receive early termination.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SECTION 3: POC ===================== -->
+<div id="poc" class="section">
+  <div class="poc-wrap">
+    <div>
+      <div class="phone-panel">
+        <div class="phone-header">
+          <div class="phone-status-dot" id="conn-dot"></div>
+          <h3>Secure WebRTC Softphone</h3>
+        </div>
+        <div class="phone-body">
+          <div class="form-row">
+            <label class="form-label">WSS Edge Endpoint</label>
+            <input class="form-input" id="wss-url" value="wss://edge.example.com:7443/ws" placeholder="wss://...">
+          </div>
+          <div class="form-row">
+            <label class="form-label">SIP URI</label>
+            <input class="form-input" id="sip-uri" value="sip:alice@example.com" placeholder="sip:user@domain">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Password</label>
+            <input class="form-input" id="sip-pw" type="password" value="••••••••" placeholder="SIP password">
+          </div>
+
+          <div class="status-pills">
+            <span class="pill pill-off" id="pill-wss"><span class="pill-dot"></span>WSS/TLS</span>
+            <span class="pill pill-off" id="pill-dtls"><span class="pill-dot"></span>DTLS-SRTP</span>
+            <span class="pill pill-off" id="pill-ice"><span class="pill-dot"></span>ICE/TURN</span>
+            <span class="pill pill-off" id="pill-reg"><span class="pill-dot"></span>Registered</span>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="btn-register" onclick="doRegister()">Register</button>
+            <button class="btn btn-outline" id="btn-unregister" onclick="doUnregister()" disabled>Unregister</button>
+          </div>
+
+          <div style="margin-top:1.2rem">
+            <div class="form-row">
+              <label class="form-label">Call Target</label>
+              <input class="form-input" id="call-target" value="sip:bob@example.com" placeholder="sip:target@domain" disabled>
+            </div>
+            <div class="call-display" id="call-display">
+              <div class="callee" id="call-callee">-</div>
+              <div class="call-state" id="call-state">Enter target and press Call</div>
+              <div class="call-timer" id="call-timer">0:00</div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-green" id="btn-call" onclick="doCall()" disabled>📞 Call</button>
+              <button class="btn btn-red" id="btn-end" onclick="doEnd()" disabled>✕ End</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sec-panel">
+        <div class="sec-header">
+          <h3>Security Controls - Live Simulation</h3>
+          <p>Simulate real attack patterns against the edge and observe defensive responses in real time.</p>
+        </div>
+        <div class="attack-btns">
+          <button class="btn-attack flood" id="atk-flood" onclick="simAttack('flood')">⚡ SIP Flood</button>
+          <button class="btn-attack reg" id="atk-reg" onclick="simAttack('reg')">📨 Registration Storm</button>
+          <button class="btn-attack enum" id="atk-enum" onclick="simAttack('enum')">🔍 Extension Enum</button>
+          <button class="btn-attack fraud" id="atk-fraud" onclick="simAttack('fraud')">💰 Toll Fraud</button>
+        </div>
+        <div class="log-box" id="log-box"></div>
+        <div class="log-disclaimer">This is an interactive simulation of platform security behavior and signaling flow. The full runnable containerized stack is the engagement deliverable.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SECTION 4: ENGAGEMENT ===================== -->
+<div id="engagement" class="section">
+  <div class="eng-wrap">
+    <div class="section-title">Engagement Structure</div>
+    <div class="section-sub">Three phases from secure prototype to full production-grade handover. Each phase delivers a complete, independently valuable outcome.</div>
+
+    <div class="phase-cards">
+      <div class="phase-card phase-1">
+        <div class="phase-side"></div>
+        <div class="phase-body">
+          <div class="phase-num">Phase 1</div>
+          <div class="phase-title">Secure Architecture + Working Prototype</div>
+          <ul class="outcome-list">
+            <li>Kamailio SBC configured with anti-flood, auth challenge, topology hiding, and TLS/WSS termination</li>
+            <li>RTPengine running DTLS-SRTP to SRTP bridging with media anchoring</li>
+            <li>Asterisk PJSIP with per-tenant dialplan fraud guards, destination allow-lists, and velocity caps</li>
+            <li>coturn STUN/TURN for NAT traversal</li>
+            <li>Browser WebRTC softphone (JsSIP) registering over WSS and placing secure calls between clients</li>
+            <li>Containerized one-command stack deployable on any Ubuntu Linux server</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase-card phase-2">
+        <div class="phase-side"></div>
+        <div class="phase-body">
+          <div class="phase-num">Phase 2</div>
+          <div class="phase-title">Discovery, Validation &amp; Extended MVP</div>
+          <ul class="outcome-list">
+            <li>Audit and integration review against existing infrastructure - identify gaps and integration points</li>
+            <li>Extended MVP proving secure SIP registration at scale under simulated load</li>
+            <li>Full WebRTC browser calling with validated DTLS-SRTP and ICE across NAT</li>
+            <li>Anti-fraud controls tuned to actual traffic patterns with real carrier trunk tests</li>
+            <li>Homer/HEP SIP capture, Prometheus metrics, and Grafana dashboards live</li>
+            <li>fail2ban integrated with Kamailio logs and synced to firewall rules</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="phase-card phase-3">
+        <div class="phase-side"></div>
+        <div class="phase-body">
+          <div class="phase-num">Phase 3</div>
+          <div class="phase-title">Documentation, Hardening &amp; Handover</div>
+          <ul class="outcome-list">
+            <li>Full architecture diagrams in draw.io / Mermaid format, ready for internal documentation</li>
+            <li>Security hardening guide covering each layer with rationale and tuning parameters</li>
+            <li>Infrastructure-as-code repository with environment variable configuration and no hardcoded secrets</li>
+            <li>Runbook covering deployment, cert rotation, scaling procedures, and incident response</li>
+            <li>Test plan demonstrating every security control firing with expected log output</li>
+            <li>Knowledge transfer sessions covering operational procedures and architecture decisions</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== NAV =====
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ===== COMPONENT DETAILS =====
+const details = {
+  'kamailio-sbc': {
+    icon: '🛡', name: 'Kamailio SBC',
+    req: 'A high-throughput proxy that can absorb internet-scale SIP traffic and enforce security policy without forwarding attacks to the call engine.',
+    choice: 'Kamailio is a stateless SIP proxy optimized for millions of transactions per second. It handles auth challenges, topology hiding, rate limiting, and TLS termination in a single process with negligible per-call overhead.',
+    benefit: 'Attacks are absorbed and dropped at the edge. The call engine (Asterisk) never sees malicious traffic. Kamailio scales horizontally - add more edge nodes behind a load balancer without touching call logic.',
+    alt: 'Exposing Asterisk directly on a public IP. Asterisk is a B2BUA built for call logic, not surviving floods. Under SIP scanning or a registration storm, Asterisk thread pools exhaust and legitimate calls drop.'
+  },
+  'pike': {
+    icon: '⚡', name: 'pike anti-flood module',
+    req: 'Automatic detection and blocking of sources generating SIP traffic above a safe request rate.',
+    choice: 'Kamailio pike module tracks per-IP request rates in shared memory. When a source exceeds the configured threshold (e.g. 10 req/s), it is automatically flagged and the request is rejected with a 503.',
+    benefit: 'Zero-configuration automatic IP banning. Protects against scripted floods and botnet traffic without manual intervention. Threshold tunable per deployment.',
+    alt: 'Manual fail2ban-only approach. fail2ban reads log files with inherent latency - hundreds of requests can arrive before the ban takes effect. pike acts at the SIP layer in microseconds.'
+  },
+  'htable': {
+    icon: '🚫', name: 'htable IP ban table',
+    req: 'Persistent in-memory storage of banned IPs that can be shared across Kamailio processes and written to by multiple modules.',
+    choice: 'Kamailio htable module provides a hash table in shared memory. pike writes banned IPs here; other modules check it on every request. Entries have configurable TTL for automatic expiry.',
+    benefit: 'Sub-millisecond ban lookup on every request. Banned IPs are rejected before any SIP parsing overhead. Works across all Kamailio worker processes.',
+    alt: 'External database lookup per request. A MySQL or Redis check on every SIP request adds 1-5ms latency and creates a bottleneck at scale. htable is in-process shared memory - no network round trip.'
+  },
+  'tls-wss': {
+    icon: '🔒', name: 'TLS / WSS Termination',
+    req: 'All signaling from internet-connected clients must be encrypted. WebRTC browsers require WSS (WebSocket Secure). SIP clients should use SIP over TLS.',
+    choice: 'Kamailio terminates TLS and WSS at the edge. Internally, signaling flows over TCP between private network components. Certificates are managed at this layer only - internal components use internal CA or self-signed.',
+    benefit: 'No cleartext SIP on the public internet. Eavesdropping and modification of signaling in transit is prevented. Certificates and key material managed in one place.',
+    alt: 'TLS pass-through to Asterisk. Asterisk handling TLS from internet-facing clients exposes the call engine directly to internet traffic. Certificate management becomes complex across multiple services.'
+  },
+  'topology': {
+    icon: '🕵', name: 'Topology Hiding',
+    req: 'Internal IP addresses of the media relay, call engine, and subscriber database must never be visible to external SIP endpoints or carriers.',
+    choice: 'Kamailio topology hiding module rewrites Via, Record-Route, and Contact headers on all SIP messages. External parties see only the edge SBC address.',
+    benefit: 'Internal infrastructure is not enumerable from SIP traffic. An attacker cannot target specific internal hosts even if they can observe SIP responses.',
+    alt: 'No topology hiding. SIP Via headers reveal internal RFC 1918 addresses by default. A compromised carrier or man-in-the-middle can enumerate the internal network topology.'
+  },
+  'geoip': {
+    icon: '🌍', name: 'Geo / ACL Filter',
+    req: 'Restrict registration and call attempts to countries and networks where the platform operates. Block known hostile network ranges proactively.',
+    choice: 'Kamailio geoip2 module checks source IP against MaxMind GeoLite2 database. Combined with htable allowlists for known carrier IPs and a blocklist for known hostile ASNs.',
+    benefit: 'Eliminates the majority of scripted attacks that originate from a small set of high-risk countries. Reduces the attack surface that pike and auth modules must handle.',
+    alt: 'Relying purely on auth. Auth challenges stop credential theft but the server still processes every request. Geo filtering cuts off the traffic before parsing - lower CPU, lower attack surface.'
+  },
+  'ratelimit': {
+    icon: '📊', name: 'Rate Limiting',
+    req: 'Cap the number of registrations, calls, and messages per extension and per IP within a time window to prevent abuse of legitimate accounts.',
+    choice: 'Kamailio ratelimit module with Redis-backed counters for distributed state. Separate limits for REGISTER, INVITE, and MESSAGE. Per-AOR and per-IP buckets.',
+    benefit: 'A compromised account cannot be used to generate unlimited outbound calls. Redis-backed counters work across multiple edge nodes - global rate limiting without sticky sessions.',
+    alt: 'Dialplan-only limits in Asterisk. Asterisk sees traffic after the edge - by the time a call reaches the dialplan, a SIP flood has already consumed edge resources. Rate limiting belongs at the edge.'
+  },
+  'anycast': {
+    icon: '☁', name: 'Anycast Scrubbing',
+    req: 'Protection against volumetric DDoS exceeding the capacity of a single edge server - traffic volumes that no software-level filter can absorb alone.',
+    choice: 'Optional upstream anycast IP with a scrubbing provider (e.g. Path.net, Cloudflare Spectrum for UDP). Kamailio edge nodes announced from multiple PoPs. Legitimate traffic is routed to the nearest clean node.',
+    benefit: 'Absorbs attacks in the hundreds of Gbps range before they reach the SIP stack. Edge nodes only see clean traffic. Failover is automatic via BGP anycast.',
+    alt: 'Single IP on one server. A 10 Gbps UDP flood overwhelms the NIC before Kamailio processes a single packet. No software countermeasure survives link saturation.'
+  },
+  'rtpengine': {
+    icon: '🎙', name: 'RTPengine',
+    req: 'A media relay that can bridge between DTLS-SRTP (WebRTC) and standard SRTP (SIP clients and carriers) without decrypting content, while anchoring all media flows.',
+    choice: 'RTPengine operates as a kernel-space media proxy. It handles ICE negotiation, DTLS handshakes for WebRTC, and transcrypts between DTLS-SRTP and SRTP. Media never flows through Asterisk.',
+    benefit: 'Browsers, softphones, and carriers all interoperate transparently. Asterisk handles call logic only - no media processing overhead. RTPengine scales independently of signaling.',
+    alt: 'Asterisk handling WebRTC media directly. Asterisk res_http_websocket and native WebRTC support works but does not scale to high media concurrency and creates tight coupling between call logic and media relay.'
+  },
+  'dtls-srtp': {
+    icon: '🔐', name: 'DTLS-SRTP Bridge',
+    req: 'WebRTC mandates DTLS-SRTP for all media. Carriers and SIP softphones use standard SRTP. These cannot interoperate without a bridge.',
+    choice: 'RTPengine performs the DTLS handshake with the browser and the SRTP key exchange with the SIP side. It transcrypts between the two encryption formats in the kernel data path.',
+    benefit: 'Transparent interoperability between browser clients and the existing SIP ecosystem. No additional gateway or media transcoder needed.',
+    alt: 'Gateway conversion through re-encryption at Asterisk. Adds latency, CPU overhead per call, and tight coupling. Also means Asterisk must be internet-reachable for WebRTC DTLS which violates the isolation model.'
+  },
+  'ice': {
+    icon: '🧊', name: 'ICE Negotiation',
+    req: 'WebRTC clients behind NAT cannot connect directly. ICE (Interactive Connectivity Establishment) discovers the best path using STUN and TURN fallback.',
+    choice: 'RTPengine handles ICE negotiation on behalf of the SIP side. coturn provides STUN and TURN relay. Edge nodes are ICE candidates. Media paths are established without exposing internal IPs.',
+    benefit: 'Reliable WebRTC connectivity from behind corporate firewalls, symmetric NAT, and mobile networks. TURN relay ensures connectivity even in the worst NAT conditions.',
+    alt: 'Direct ICE without a relay. Works for simple NAT but fails in enterprise firewall environments (symmetric NAT, strict UDP filtering). TURN is mandatory for production WebRTC.'
+  },
+  'coturn': {
+    icon: '↩', name: 'coturn STUN/TURN',
+    req: 'WebRTC clients need a STUN server to discover their public IP and a TURN relay server for media when direct connection fails.',
+    choice: 'coturn is the reference TURN/STUN server. Deployed in the private zone but with public-facing TURN ports. Credentials are scoped per session using HMAC-SHA1 time-limited tokens.',
+    benefit: 'Standard, well-audited TURN implementation. Time-limited credentials prevent TURN relay abuse. Integrates with Kamailio-generated nonces.',
+    alt: 'Using a public STUN server (e.g. stun.google.com). Public STUN reveals the client public IP to a third party. No TURN relay means WebRTC fails behind strict NAT. Not acceptable for production.'
+  },
+  'media-anchor': {
+    icon: '⚓', name: 'Media Anchoring',
+    req: 'All RTP flows must pass through a controlled point. No client should be able to send media directly to another client or to internal hosts.',
+    choice: 'RTPengine anchors every call leg. Kamailio instructs RTPengine via the NGCP protocol to anchor media before confirming any call. Direct media is never negotiated.',
+    benefit: 'Media injection attacks require compromising the anchor point, not just spoofing a client IP. Internal hosts are not visible as SDP candidates. All media is inspectable for anomalies.',
+    alt: 'Direct media (SDP passthrough). Clients negotiate direct RTP paths. Eliminates the media relay as a security control point and exposes internal IP addresses in SDP offers.'
+  },
+  'asterisk': {
+    icon: '⚙', name: 'Asterisk PJSIP',
+    req: 'A call engine for IVR logic, ACD queues, bridging between call legs, secure recording, and carrier interconnect - with no direct internet exposure.',
+    choice: 'Asterisk with PJSIP channel driver. TLS and SRTP enforced on all trunks. Runs in the private zone - only accepts connections from Kamailio dispatcher and RTPengine. No public IP.',
+    benefit: 'Full programmable call logic (dialplan, AGI, ARI) without internet exposure. PJSIP handles SIP correctly and supports per-transport security configuration.',
+    alt: 'chan_sip (legacy). chan_sip is deprecated and has known security issues. PJSIP provides proper TLS transport, better RFC compliance, and active maintenance.'
+  },
+  'per-tenant': {
+    icon: '🏢', name: 'Per-Tenant Contexts',
+    req: 'Multiple tenants or customer segments must be isolated - a compromised account in one tenant cannot reach extensions in another.',
+    choice: 'Asterisk dialplan contexts are assigned per-tenant. Inbound routing from Kamailio includes tenant context in the SIP routing headers. No cross-context bridging except through explicit gateway contexts.',
+    benefit: 'Tenant isolation at the call engine level. A toll fraud event in one tenant cannot generate calls on another tenant\'s trunks.',
+    alt: 'Single shared dialplan context. All extensions share routing logic. A compromised extension can attempt to reach any destination without tenant boundary enforcement.'
+  },
+  'dialplan-fraud': {
+    icon: '🔑', name: 'Dialplan Fraud Guards',
+    req: 'Even with edge protections, a legitimately authenticated but compromised extension could attempt toll fraud from within the platform.',
+    choice: 'Per-account concurrent call caps enforced in dialplan using Asterisk\'s CHANNEL and GROUP functions. Destination allow-lists checked before outbound routing. High-risk international prefix blocklist. Velocity limiter using AstDB counters. Auto-suspend via AMI on anomaly detection.',
+    benefit: 'Toll fraud is stopped at the call logic layer even if the edge allows the call. Multiple independent controls must all fail for fraud to succeed.',
+    alt: 'Trust the edge alone. Edge controls prevent unauthorized access but cannot know which destinations are legitimate for a given account. Dialplan guards are the last line of defense against insider abuse.'
+  },
+  'recording': {
+    icon: '🎬', name: 'Secure Recording',
+    req: 'Call recordings must be stored securely with access controls, not written to a world-readable path.',
+    choice: 'Asterisk MixMonitor writes recordings to a restricted path. Files are AES-encrypted at rest using a per-tenant key before archival. Access is via authenticated API only.',
+    benefit: 'Recordings are not accessible even if the host filesystem is read by an attacker. Per-tenant keys limit blast radius of a key compromise.',
+    alt: 'Plain file storage. Unencrypted recordings on shared storage expose call content to any process with filesystem access.'
+  },
+  'ivr': {
+    icon: '📋', name: 'IVR / ACD Queues',
+    req: 'Interactive voice response, call queues, and agent routing logic for the CCaaS use case.',
+    choice: 'Asterisk dialplan with AGI scripts for dynamic IVR. Built-in Queue() application for ACD. ARI (Asterisk REST Interface) for real-time control from external applications.',
+    benefit: 'Full programmability without external dependencies. ARI enables real-time call control from web applications and CRM integrations.',
+    alt: 'A separate IVR platform. Adds integration complexity, additional attack surface, and latency. Asterisk handles this natively with lower operational overhead.'
+  },
+  'dispatcher': {
+    icon: '⚖', name: 'Kamailio Dispatcher',
+    req: 'Multiple Asterisk instances must share inbound load. Health checks must route around failed instances without manual intervention.',
+    choice: 'Kamailio dispatcher module maintains a pool of Asterisk instances with configurable routing algorithms (round-robin, least-loaded, hash). Health checks via OPTIONS pings remove failed nodes automatically.',
+    benefit: 'Zero-downtime Asterisk restarts and upgrades. Horizontal scaling of call capacity by adding nodes. No single point of failure in the call engine layer.',
+    alt: 'DNS load balancing. DNS has no health check awareness - failed nodes continue receiving traffic until TTL expires. Kamailio dispatcher removes unhealthy nodes in seconds.'
+  },
+  'subscriber-db': {
+    icon: '🗄', name: 'Subscriber Database',
+    req: 'Persistent storage for SIP credentials, registration state, call records, and account configuration accessible across all Kamailio instances.',
+    choice: 'MySQL / MariaDB with Kamailio usrloc and auth_db modules. Registration state mirrored to Redis for fast distributed lookup. Schema optimized for high-read auth patterns.',
+    benefit: 'Centralized credential store with no per-node state. Any edge node can authenticate any user. Failover between edge nodes requires no re-registration.',
+    alt: 'Per-node registration state. Each Kamailio instance has its own usrloc. A failover forces all registered clients to re-register simultaneously - a registration storm caused by your own infrastructure.'
+  },
+  'redis': {
+    icon: '📡', name: 'Redis Shared State',
+    req: 'Rate counters, IP ban tables, registration cache, and call state must be consistent across all Kamailio edge nodes in real time.',
+    choice: 'Redis cluster for distributed shared memory. Kamailio ndb_redis module writes ban events, rate counters, and registration cache keys. Sub-millisecond reads on every SIP request path.',
+    benefit: 'Stateless edge nodes share a consistent view of bans, rate limits, and registrations. Scale edge nodes without coordination overhead.',
+    alt: 'Per-node state only. Rate limits and bans are per-node. An attacker distributes requests across nodes to stay under per-node thresholds. Shared state closes this gap.'
+  },
+  'carrier-trunks': {
+    icon: '🔌', name: 'Carrier SIP Trunks (TLS)',
+    req: 'Outbound PSTN calls require SIP trunks to one or more carriers. These connections must be authenticated, encrypted, and capacity-capped.',
+    choice: 'Carrier trunks configured in Asterisk PJSIP with TLS transport. Per-trunk concurrent call caps enforced in dialplan. Trunk failover via Kamailio dispatcher. Credentials in environment variables.',
+    benefit: 'Encrypted carrier interconnect. Per-trunk caps prevent a single compromised account from exhausting carrier capacity. Trunk failover is automatic.',
+    alt: 'Cleartext SIP to carriers. UDP SIP trunks are unencrypted. Credentials in SIP REGISTER messages can be captured in transit. Carrier fraud is undetectable until the bill arrives.'
+  },
+  'stir': {
+    icon: '✍', name: 'STIR / SHAKEN Signing',
+    req: 'Outbound calls should carry attestation to reduce spoofed caller ID and ensure carrier acceptance under STIR/SHAKEN mandates.',
+    choice: 'Asterisk STIR/SHAKEN module signs outbound INVITE with a certificate issued by an STI-CA. Attestation level (A/B/C) based on caller ID ownership verification.',
+    benefit: 'Outbound calls pass carrier SHAKEN verification. Reduces probability of calls being marked as spam by carrier analytics. Compliance with regulatory requirements.',
+    alt: 'No signing. Unsigned calls receive lower attestation scores in carrier verification chains and are increasingly likely to be marked or rejected by terminating carriers.'
+  },
+  'lcr': {
+    icon: '🗺', name: 'LCR Engine',
+    req: 'Route outbound calls through the least-cost carrier for each destination while respecting quality and fraud rules.',
+    choice: 'Kamailio lcr module with prefix-based routing table. Carrier priority and quality scores updated in real time. Fraud-blocked prefixes excluded from all routes regardless of cost.',
+    benefit: 'Carrier cost optimization without compromising security. Fraud-blocked destinations cannot be reached even via least-cost routing.',
+    alt: 'Static routing table. Manual updates required when carriers change rates. Fraud-blocked prefixes may still route if not manually removed from every static table.'
+  },
+  'homer': {
+    icon: '📊', name: 'Homer / HEP SIP Capture',
+    req: 'Full capture of all SIP signaling for troubleshooting, fraud investigation, and compliance.',
+    choice: 'Kamailio siptrace module sends SIP messages via HEP (Homer Encapsulation Protocol) to a Homer server. All INVITE, REGISTER, BYE, and error responses captured. Search by call-id, from/to, or IP.',
+    benefit: 'Post-incident reconstruction of any call flow. Fraud investigations have complete signaling trail. No performance impact on Kamailio - HEP is asynchronous UDP.',
+    alt: 'Filesystem SIP trace logs. Log rotation and grep-based analysis does not scale. Homer provides indexed search across millions of messages with a web UI.'
+  },
+  'prometheus': {
+    icon: '📈', name: 'Prometheus + Grafana',
+    req: 'Real-time visibility into call volumes, error rates, registration counts, and resource utilization across all platform components.',
+    choice: 'Kamailio xhttp_prom module exposes metrics at /metrics. Asterisk prometheus module added. RTPengine native Prometheus endpoint. Grafana dashboards for each layer.',
+    benefit: 'Unified observability across all components. Alerting on call volume spikes, registration storms, error rate increases, and resource exhaustion.',
+    alt: 'SNMP polling. SNMP is complex to configure and has coarser granularity. Prometheus pull model is simpler, more flexible, and integrates with the entire cloud-native toolchain.'
+  },
+  'fail2ban': {
+    icon: '🚧', name: 'fail2ban Firewall Sync',
+    req: 'IPs banned by Kamailio (pike, htable) should be dropped at the OS firewall level so their traffic does not consume any CPU processing Kamailio rejects.',
+    choice: 'fail2ban reads Kamailio log output (ban events piped via syslog). On a match, fail2ban inserts an iptables DROP rule. Kamailio also writes ban events to a named pipe that fail2ban monitors.',
+    benefit: 'Banned IPs are dropped at the kernel packet filter - zero Kamailio overhead. Even if Kamailio is saturated, the firewall continues dropping the attackers\' traffic.',
+    alt: 'Kamailio-only banning. Kamailio still allocates a worker to read and reject banned packets. Under extreme flood, this consumes CPU. Kernel-level firewall rules cost nothing per packet.'
+  },
+  'cdr': {
+    icon: '📋', name: 'CDR + Fraud Analytics',
+    req: 'Every call must produce a billing record. Anomalous call patterns must trigger alerts before significant damage occurs.',
+    choice: 'Asterisk CEL (Channel Event Logging) to MySQL for CDR. Real-time analytics job runs velocity checks, detects geographic anomalies, and flags accounts exceeding baseline call volume by configurable multiples.',
+    benefit: 'Fraud detected within minutes of anomaly onset. CDR available for billing and dispute resolution. Analytics threshold is tunable without code changes.',
+    alt: 'End-of-day CDR batch processing. Toll fraud runs for hours before detection. Real-time analytics is mandatory when compromised accounts can generate thousands of dollars in charges per hour.'
+  },
+  'alerting': {
+    icon: '🔔', name: 'Spike / Storm Alerting',
+    req: 'Operations teams must be notified immediately when registration storms, call volume spikes, or high error rates indicate an attack or infrastructure failure.',
+    choice: 'Grafana alerting on Prometheus metrics. Alertmanager routes notifications to PagerDuty / Slack / email. Thresholds: registration rate > 2x baseline, error rate > 5%, CPU > 85% for 2 minutes.',
+    benefit: 'Response time measured in minutes rather than hours. Automated runbook links in alerts reduce mean-time-to-resolution.',
+    alt: 'Manual monitoring. Operations teams notice problems when calls fail or customers report issues. By then, significant fraud or revenue impact has already occurred.'
+  }
+};
+
+function showDetail(key) {
+  const d = details[key];
+  if (!d) return;
+  document.querySelectorAll('.comp-box').forEach(b => b.style.outline = 'none');
+  event.currentTarget.style.outline = '2px solid #60a5fa';
+
+  document.getElementById('detail-panel').innerHTML = `
+    <h3>${d.icon} ${d.name}</h3>
+    <div class="detail-section">
+      <h4>Client Requirement</h4>
+      <p>${d.req}</p>
+    </div>
+    <div class="detail-section">
+      <h4>What We Chose and Why</h4>
+      <p>${d.choice}</p>
+    </div>
+    <div class="detail-section">
+      <h4>Benefit</h4>
+      <p>${d.benefit}</p>
+    </div>
+    <div class="detail-section">
+      <h4>Common Alternative</h4>
+      <div class="detail-alt">${d.alt}</div>
+    </div>
+  `;
+}
+
+// ===== SOFTPHONE SIMULATION =====
+let registered = false;
+let inCall = false;
+let callTimer = null;
+let callSeconds = 0;
+let regTimeout = null;
+
+function setPill(id, state) {
+  const p = document.getElementById(id);
+  p.className = 'pill ' + (state === 'on' ? 'pill-on' : state === 'busy' ? 'pill-busy' : 'pill-off');
+}
+
+function setDot(state) {
+  const d = document.getElementById('conn-dot');
+  d.className = 'phone-status-dot ' + (state === 'green' ? 'green' : state === 'yellow' ? 'yellow' : '');
+}
+
+function doRegister() {
+  if (registered) return;
+  const wss = document.getElementById('wss-url').value;
+  const uri = document.getElementById('sip-uri').value;
+  if (!wss || !uri) return;
+
+  document.getElementById('btn-register').disabled = true;
+  setDot('yellow');
+  setPill('pill-wss', 'busy');
+
+  addLog('Connecting to WSS edge...');
+
+  setTimeout(() => {
+    setPill('pill-wss', 'on');
+    addLog('WSS/TLS handshake complete - cipher TLS_AES_256_GCM_SHA384');
+    setTimeout(() => {
+      addLog('Sending REGISTER ' + uri + ' via Kamailio edge...');
+      setTimeout(() => {
+        addLog('401 Unauthorized - digest auth challenge received');
+        setTimeout(() => {
+          addLog('Sending REGISTER with digest response...');
+          setTimeout(() => {
+            addLog('200 OK - registered, expires=3600');
+            setPill('pill-reg', 'on');
+            setPill('pill-ice', 'on');
+            setPill('pill-dtls', 'on');
+            setDot('green');
+            registered = true;
+            document.getElementById('btn-register').disabled = false;
+            document.getElementById('btn-unregister').disabled = false;
+            document.getElementById('btn-call').disabled = false;
+            document.getElementById('call-target').disabled = false;
+          }, 600);
+        }, 500);
+      }, 700);
+    }, 800);
+  }, 900);
+}
+
+function doUnregister() {
+  if (!registered || inCall) return;
+  registered = false;
+  document.getElementById('btn-unregister').disabled = true;
+  document.getElementById('btn-call').disabled = true;
+  document.getElementById('call-target').disabled = true;
+  setPill('pill-reg', 'off');
+  setDot('');
+  addLog('REGISTER expires=0 sent - unregistered');
+}
+
+function doCall() {
+  if (!registered || inCall) return;
+  const target = document.getElementById('call-target').value;
+  if (!target) return;
+  inCall = true;
+  document.getElementById('btn-call').disabled = true;
+  document.getElementById('btn-end').disabled = false;
+  document.getElementById('call-callee').textContent = target;
+  document.getElementById('call-state').textContent = 'Calling...';
+  addLog('INVITE ' + target + ' - ICE gathering started');
+
+  setTimeout(() => {
+    addLog('DTLS-SRTP handshake with RTPengine - media anchored');
+    document.getElementById('call-state').textContent = 'Ringing...';
+    setTimeout(() => {
+      addLog('200 OK - call established, SRTP active');
+      document.getElementById('call-state').textContent = 'In call - SRTP active';
+      document.getElementById('call-timer').style.display = 'block';
+      callSeconds = 0;
+      callTimer = setInterval(() => {
+        callSeconds++;
+        const m = Math.floor(callSeconds / 60);
+        const s = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('call-timer').textContent = m + ':' + s;
+      }, 1000);
+    }, 1200);
+  }, 1000);
+}
+
+function doEnd() {
+  if (!inCall) return;
+  inCall = false;
+  clearInterval(callTimer);
+  document.getElementById('call-timer').style.display = 'none';
+  document.getElementById('call-state').textContent = 'Call ended';
+  document.getElementById('call-callee').textContent = '-';
+  document.getElementById('btn-end').disabled = true;
+  document.getElementById('btn-call').disabled = false;
+  addLog('BYE sent - call terminated, CDR written');
+}
+
+// ===== ATTACK SIMULATION =====
+let attackRunning = false;
+
+function addLog(msg, cls) {
+  const box = document.getElementById('log-box');
+  const now = new Date();
+  const ts = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${ts}</span><span class="log-${cls||'info'}">${msg}</span>`;
+  box.appendChild(entry);
+  box.scrollTop = box.scrollHeight;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function simAttack(type) {
+  if (attackRunning) return;
+  attackRunning = true;
+  document.querySelectorAll('.btn-attack').forEach(b => b.disabled = true);
+
+  if (type === 'flood') {
+    const src = '185.234.' + (Math.floor(Math.random()*200)+10) + '.' + (Math.floor(Math.random()*200)+1);
+    addLog('[SIP-FLOOD] INVITE flood detected from ' + src, 'warn');
+    await sleep(300);
+    addLog('[pike] 847 req/s from ' + src + ' exceeds threshold (50 req/s)', 'warn');
+    await sleep(400);
+    addLog('[pike] Source ' + src + ' auto-banned, writing to htable[ipban]', 'block');
+    await sleep(350);
+    addLog('[htable] IP ' + src + ' added to ban table, TTL=300s', 'block');
+    await sleep(400);
+    addLog('[fail2ban] Rule inserted: iptables -I INPUT -s ' + src + ' -j DROP', 'block');
+    await sleep(300);
+    addLog('[pike] 12 additional IPs from AS49581 flagged - rate 612-1204 req/s', 'warn');
+    await sleep(400);
+    addLog('[edge] Flood absorbed at kernel layer - call engine unaffected', 'allow');
+  } else if (type === 'reg') {
+    const user = 'ext' + (Math.floor(Math.random()*9000)+1000);
+    const src = '91.108.' + (Math.floor(Math.random()*100)+1) + '.' + (Math.floor(Math.random()*200)+1);
+    addLog('[REG-STORM] REGISTER storm for ' + user + '@example.com from ' + src, 'warn');
+    await sleep(300);
+    addLog('[ratelimit] Per-AOR threshold exceeded: 18 REGISTER/60s (limit: 5)', 'warn');
+    await sleep(400);
+    addLog('[htable] 401 returned - auth failures: 3 for ' + user, 'warn');
+    await sleep(350);
+    addLog('[htable] Auth failures: 5 - escalating ban window to 3600s for ' + src, 'block');
+    await sleep(400);
+    addLog('[fail2ban] firewall DROP rule inserted for ' + src, 'block');
+    await sleep(300);
+    addLog('[edge] Registration storm neutralized - 0 registrations reached call engine', 'allow');
+  } else if (type === 'enum') {
+    addLog('[ENUM] Extension enumeration detected - unusual INVITE pattern', 'warn');
+    await sleep(300);
+    addLog('[edge] INVITE sip:1001@example.com -> 401 Unauthorized (uniform response)', 'info');
+    await sleep(250);
+    addLog('[edge] INVITE sip:1002@example.com -> 401 Unauthorized (uniform response)', 'info');
+    await sleep(250);
+    addLog('[edge] INVITE sip:1003@example.com -> 401 Unauthorized (uniform response)', 'info');
+    await sleep(300);
+    addLog('[edge] Scanner User-Agent detected: "friendly-scanner/3.1"', 'warn');
+    await sleep(350);
+    addLog('[htable] Scanner User-Agent blocked, source IP added to ban table', 'block');
+    await sleep(400);
+    addLog('[edge] Topology hidden - zero internal addresses disclosed in responses', 'allow');
+  } else if (type === 'fraud') {
+    const ext = 'sip:ext' + (Math.floor(Math.random()*900)+100) + '@example.com';
+    addLog('[FRAUD] Compromised account ' + ext + ' dialing high-risk destinations', 'warn');
+    await sleep(350);
+    addLog('[dialplan] INVITE to +883 (premium international) - checking prefix blocklist', 'info');
+    await sleep(300);
+    addLog('[dialplan] Destination +88324... matches BLOCKED_PREFIXES - REJECT', 'block');
+    await sleep(350);
+    addLog('[dialplan] Concurrent calls for account: 4 - checking velocity (limit: 3)', 'warn');
+    await sleep(300);
+    addLog('[dialplan] Velocity cap exceeded - all new calls from account BLOCKED', 'block');
+    await sleep(400);
+    addLog('[fraud-analytics] Anomaly score 94/100 - auto-suspend triggered for account', 'block');
+    await sleep(350);
+    addLog('[AMI] Account disabled via Asterisk Manager Interface - operator notified', 'block');
+    await sleep(300);
+    addLog('[fraud] Incident contained - 0 successful premium calls completed', 'allow');
+  }
+
+  attackRunning = false;
+  document.querySelectorAll('.btn-attack').forEach(b => b.disabled = false);
+}
+
+// Init log
+addLog('Edge node online - Kamailio SBC v5.7 ready', 'allow');
+addLog('RTPengine connected - DTLS-SRTP bridge active', 'allow');
+addLog('fail2ban watching /var/log/kamailio/kamailio.log', 'allow');
+</script>
+</body>
+</html>

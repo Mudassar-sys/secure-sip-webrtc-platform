@@ -59,11 +59,11 @@ audio{display:none}
   <div class="ph-body">
     <div class="field">
       <label>WSS Endpoint</label>
-      <input id="wss" value="wss://YOUR_DOMAIN:8443/ws" placeholder="wss://...">
+      <input id="wss" value="wss://151-115-164-7.sslip.io/ws" placeholder="wss://...">
     </div>
     <div class="field">
       <label>SIP URI</label>
-      <input id="uri" value="sip:alice@YOUR_DOMAIN" placeholder="sip:user@domain">
+      <input id="uri" value="sip:alice@151-115-164-7.sslip.io" placeholder="sip:user@domain">
     </div>
     <div class="field">
       <label>Password</label>
@@ -84,7 +84,7 @@ audio{display:none}
 
     <div class="field" style="margin-top:1rem">
       <label>Call Target</label>
-      <input id="target" value="sip:bob@YOUR_DOMAIN" placeholder="sip:target@domain" disabled>
+      <input id="target" value="sip:bob@151-115-164-7.sslip.io" placeholder="sip:target@domain" disabled>
     </div>
 
     <div class="call-screen" id="call-screen">
@@ -228,11 +228,11 @@ function doCall() {
     rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
     pcConfig: {
       iceServers: [
-        { urls: 'stun:' + window.location.hostname + ':3478' },
+        { urls: 'stun:151.115.164.7:3478' },
         {
-          urls: 'turn:' + window.location.hostname + ':3478',
-          username: 'webrtc',
-          credential: 'webrtc'
+          urls: 'turn:151.115.164.7:3478',
+          username: 'demo',
+          credential: 'DemoTurn2024'
         }
       ]
     }

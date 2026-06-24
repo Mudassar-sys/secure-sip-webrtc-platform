@@ -1,0 +1,18 @@
+{$DOMAIN} {
+    root * /usr/share/caddy
+    file_server
+
+    # Reverse-proxy WebSocket SIP traffic to Kamailio WSS port
+    @ws {
+        path /ws
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @ws 127.0.0.1:8443 {
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+
+    encode gzip
+}

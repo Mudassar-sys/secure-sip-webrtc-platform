@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Secure WebRTC Softphone</title>
-<script src="https://cdn.jsdelivr.net/npm/jssip@3.10.0/dist/jssip.min.js"></script>
+<script src="/jssip.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#0a0e1a;--bg2:#0f1629;--bg3:#151d35;--border:#1e2d50;--accent:#2563eb;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b}
@@ -41,6 +41,11 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .call-name{font-size:1rem;font-weight:700;color:#fff}
 .call-state{font-size:.78rem;color:var(--text2);margin-top:.2rem}
 .call-timer{font-size:1.3rem;font-weight:700;font-family:monospace;color:var(--green);margin-top:.4rem;display:none}
+.incoming-banner{display:none;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.4);border-radius:10px;padding:1rem;text-align:center;margin:.8rem 0;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{border-color:rgba(16,185,129,.4)}50%{border-color:rgba(16,185,129,.9)}}
+.incoming-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--green);font-weight:700}
+.incoming-name{font-size:1rem;font-weight:700;color:#fff;margin:.3rem 0}
+.incoming-btns{display:flex;gap:.6rem;margin-top:.8rem}
 .log{margin-top:1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;height:110px;overflow-y:auto;padding:.6rem .8rem;font-family:monospace;font-size:.7rem;color:var(--text2)}
 .log-entry{margin-bottom:.15rem}
 .log-entry.info{color:#67e8f9}
@@ -87,6 +92,15 @@ audio{display:none}
       <input id="target" value="sip:bob@151-115-164-7.sslip.io" placeholder="sip:target@domain" disabled>
     </div>
 
+    <div class="incoming-banner" id="incoming-banner">
+      <div class="incoming-label">Incoming Call</div>
+      <div class="incoming-name" id="incoming-name">-</div>
+      <div class="incoming-btns">
+        <button class="btn-green" onclick="doAnswer()">Answer</button>
+        <button class="btn-red" onclick="doReject()">Reject</button>
+      </div>
+    </div>
+
     <div class="call-screen" id="call-screen">
       <div class="call-name" id="c-name">-</div>
       <div class="call-state" id="c-state">Ready to call once registered</div>
@@ -95,7 +109,7 @@ audio{display:none}
 
     <div class="btns">
       <button class="btn-green" id="b-call" onclick="doCall()" disabled>Call</button>
-      <button class="btn-red" id="b-end" onclick="doEnd()" disabled>End</button>
+      <button class="btn-red" id="b-end" onclick="doEnd()" disabled>End Call</button>
     </div>
 
     <div class="log" id="log"></div>
@@ -103,32 +117,38 @@ audio{display:none}
 </div>
 
 <audio id="remote-audio" autoplay></audio>
-<audio id="ringback" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAA..." loop></audio>
 
 <script>
 let ua = null;
 let session = null;
+let inboundSession = null;
 let callTimer = null;
 let callSec = 0;
 
-function log(msg, cls='info') {
+const ICE_CFG = {
+  iceServers: [
+    { urls: 'stun:151.115.164.7:3478' },
+    { urls: 'turn:151.115.164.7:3478', username: 'demo', credential: 'DemoTurn2024' }
+  ]
+};
+
+function log(msg, cls) {
+  cls = cls || 'info';
   const box = document.getElementById('log');
   const d = document.createElement('div');
   d.className = 'log-entry ' + cls;
-  const t = new Date().toLocaleTimeString('en-GB',{hour12:false});
+  const t = new Date().toLocaleTimeString('en-GB', {hour12: false});
   d.textContent = '[' + t + '] ' + msg;
   box.appendChild(d);
   box.scrollTop = box.scrollHeight;
 }
 
 function pill(id, state) {
-  const el = document.getElementById(id);
-  el.className = 'pill' + (state === 'on' ? ' on' : state === 'busy' ? ' busy' : '');
+  document.getElementById(id).className = 'pill' + (state === 'on' ? ' on' : state === 'busy' ? ' busy' : '');
 }
 
 function light(state) {
-  const el = document.getElementById('slight');
-  el.className = 'status-light' + (state ? ' ' + state : '');
+  document.getElementById('slight').className = 'status-light' + (state ? ' ' + state : '');
 }
 
 function doReg() {
@@ -136,10 +156,6 @@ function doReg() {
   const uri = document.getElementById('uri').value.trim();
   const pw  = document.getElementById('pw').value.trim();
   if (!wss || !uri || !pw) { alert('Fill in all fields'); return; }
-
-  const user = uri.match(/sip:([^@]+)/)?.[1];
-  const domain = uri.match(/@(.+)/)?.[1];
-  if (!user || !domain) { alert('Invalid SIP URI'); return; }
 
   document.getElementById('b-reg').disabled = true;
   light('yellow');
@@ -155,56 +171,38 @@ function doReg() {
     register: true,
     register_expires: 300,
     user_agent: 'SecureSIP-WebRTC/1.0',
-    session_timers: true,
+    session_timers: true
   });
 
-  ua.on('connecting', () => {
-    log('WSS/TLS handshake in progress...');
-    pill('p-wss', 'busy');
-  });
+  ua.on('connecting', function() { log('WSS/TLS handshake in progress...'); pill('p-wss', 'busy'); });
+  ua.on('connected',  function() { log('WSS/TLS connected', 'ok'); pill('p-wss', 'on'); });
+  ua.on('disconnected', function() { log('WSS disconnected', 'warn'); pill('p-wss', ''); light(''); });
 
-  ua.on('connected', () => {
-    log('WSS/TLS connected', 'ok');
-    pill('p-wss', 'on');
-  });
-
-  ua.on('disconnected', () => {
-    log('WSS disconnected', 'warn');
-    pill('p-wss', '');
-    light('');
-  });
-
-  ua.on('registered', () => {
+  ua.on('registered', function() {
     log('Registered as ' + uri, 'ok');
-    pill('p-reg', 'on');
-    pill('p-ice', 'on');
-    light('green');
+    pill('p-reg', 'on'); pill('p-ice', 'on'); light('green');
     document.getElementById('b-unreg').disabled = false;
     document.getElementById('b-call').disabled = false;
     document.getElementById('target').disabled = false;
   });
 
-  ua.on('unregistered', () => {
+  ua.on('unregistered', function() {
     log('Unregistered');
-    pill('p-reg', '');
-    pill('p-ice', '');
-    light('');
+    pill('p-reg', ''); pill('p-ice', ''); light('');
     document.getElementById('b-reg').disabled = false;
     document.getElementById('b-unreg').disabled = true;
     document.getElementById('b-call').disabled = true;
     document.getElementById('target').disabled = true;
   });
 
-  ua.on('registrationFailed', (e) => {
+  ua.on('registrationFailed', function(e) {
     log('Registration failed: ' + e.cause, 'err');
     document.getElementById('b-reg').disabled = false;
     light('');
   });
 
-  ua.on('newRTCSession', (e) => {
-    if (e.originator === 'remote') {
-      handleInbound(e.session);
-    }
+  ua.on('newRTCSession', function(e) {
+    if (e.originator === 'remote') { handleInbound(e.session); }
   });
 
   ua.start();
@@ -218,87 +216,99 @@ function doCall() {
   if (!ua || session) return;
   const target = document.getElementById('target').value.trim();
   if (!target) return;
-
   log('Calling ' + target + '...');
   document.getElementById('c-name').textContent = target;
   document.getElementById('c-state').textContent = 'Calling...';
-
-  const opts = {
+  session = ua.call(target, {
     mediaConstraints: { audio: true, video: false },
     rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
-    pcConfig: {
-      iceServers: [
-        { urls: 'stun:151.115.164.7:3478' },
-        {
-          urls: 'turn:151.115.164.7:3478',
-          username: 'demo',
-          credential: 'DemoTurn2024'
-        }
-      ]
-    }
-  };
-
-  session = ua.call(target, opts);
+    pcConfig: ICE_CFG
+  });
   bindSession(session);
   document.getElementById('b-call').disabled = true;
   document.getElementById('b-end').disabled = false;
 }
 
 function handleInbound(sess) {
-  session = sess;
-  log('Inbound call from ' + sess.remote_identity.uri, 'ok');
-  document.getElementById('c-name').textContent = sess.remote_identity.uri.toString();
-  document.getElementById('c-state').textContent = 'Inbound call...';
-  bindSession(sess);
-  sess.answer({ mediaConstraints: { audio: true, video: false } });
-  document.getElementById('b-end').disabled = false;
+  inboundSession = sess;
+  const caller = sess.remote_identity.uri.toString();
+  log('Incoming call from ' + caller, 'ok');
+  document.getElementById('incoming-name').textContent = caller;
+  document.getElementById('incoming-banner').style.display = 'block';
   document.getElementById('b-call').disabled = true;
+  sess.on('failed', function() {
+    if (inboundSession === sess) {
+      inboundSession = null;
+      document.getElementById('incoming-banner').style.display = 'none';
+      document.getElementById('b-call').disabled = false;
+    }
+  });
+  sess.on('ended', function() {
+    if (inboundSession === sess) {
+      inboundSession = null;
+      document.getElementById('incoming-banner').style.display = 'none';
+      document.getElementById('b-call').disabled = false;
+    }
+  });
+}
+
+function doAnswer() {
+  if (!inboundSession) return;
+  session = inboundSession;
+  inboundSession = null;
+  document.getElementById('incoming-banner').style.display = 'none';
+  document.getElementById('c-name').textContent = session.remote_identity.uri.toString();
+  document.getElementById('c-state').textContent = 'Connecting...';
+  document.getElementById('b-end').disabled = false;
+  bindSession(session);
+  session.answer({
+    mediaConstraints: { audio: true, video: false },
+    pcConfig: ICE_CFG
+  });
+  log('Call answered', 'ok');
+}
+
+function doReject() {
+  if (inboundSession) { try { inboundSession.terminate(); } catch(e) {} inboundSession = null; }
+  document.getElementById('incoming-banner').style.display = 'none';
+  document.getElementById('b-call').disabled = false;
+  log('Call rejected');
 }
 
 function bindSession(sess) {
-  sess.on('progress', () => {
+  sess.on('progress', function() {
     log('Ringing...');
     document.getElementById('c-state').textContent = 'Ringing...';
   });
-
-  sess.on('accepted', () => {
+  sess.on('accepted', function() {
     log('Call connected - DTLS-SRTP active', 'ok');
     document.getElementById('c-state').textContent = 'In call - SRTP active';
     pill('p-srtp', 'on');
     document.getElementById('c-timer').style.display = 'block';
     callSec = 0;
-    callTimer = setInterval(() => {
+    callTimer = setInterval(function() {
       callSec++;
       const m = Math.floor(callSec / 60);
       const s = String(callSec % 60).padStart(2, '0');
       document.getElementById('c-timer').textContent = m + ':' + s;
     }, 1000);
-
     const pc = sess.connection;
     if (pc) {
       const remote = new MediaStream();
-      pc.getReceivers().forEach(r => remote.addTrack(r.track));
+      pc.getReceivers().forEach(function(r) { remote.addTrack(r.track); });
       document.getElementById('remote-audio').srcObject = remote;
     }
   });
-
-  sess.on('ended', () => {
-    log('Call ended (' + sess.cause + ')');
-    resetCall();
-  });
-
-  sess.on('failed', (e) => {
-    log('Call failed: ' + e.cause, 'err');
-    resetCall();
-  });
-
-  sess.on('icecandidate', (e) => {
-    log('ICE: ' + e.candidate.type + ' candidate gathered');
-  });
+  sess.on('ended', function() { log('Call ended (' + sess.cause + ')'); resetCall(); });
+  sess.on('failed', function(e) { log('Call failed: ' + e.cause, 'err'); resetCall(); });
+  sess.on('icecandidate', function(e) { log('ICE: ' + e.candidate.type + ' candidate gathered'); });
 }
 
 function doEnd() {
-  if (session) { session.terminate(); session = null; }
+  if (session) { try { session.terminate(); } catch(e) {} session = null; }
+  if (inboundSession) { try { inboundSession.terminate(); } catch(e) {} inboundSession = null; }
+  document.getElementById('incoming-banner').style.display = 'none';
+  resetCall();
 }
 
 function resetCall() {
@@ -308,8 +318,10 @@ function resetCall() {
   document.getElementById('c-name').textContent = '-';
   document.getElementById('b-call').disabled = false;
   document.getElementById('b-end').disabled = true;
+  document.getElementById('incoming-banner').style.display = 'none';
   pill('p-srtp', '');
   session = null;
+  inboundSession = null;
 }
 </script>
 </body>

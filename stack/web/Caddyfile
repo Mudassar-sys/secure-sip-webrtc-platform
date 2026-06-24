@@ -1,17 +1,14 @@
-{$DOMAIN} {
+151-115-164-7.sslip.io {
     root * /usr/share/caddy
     file_server
 
-    # Reverse-proxy WebSocket SIP traffic to Kamailio WSS port
     @ws {
         path /ws
         header Connection *Upgrade*
         header Upgrade websocket
     }
-    reverse_proxy @ws 127.0.0.1:8443 {
-        transport http {
-            tls_insecure_skip_verify
-        }
+    reverse_proxy @ws 172.18.0.1:8088 {
+        flush_interval -1
     }
 
     encode gzip

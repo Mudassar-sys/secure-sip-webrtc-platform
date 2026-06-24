@@ -96,6 +96,7 @@ services:
     build: ./asterisk
     container_name: sip-asterisk
     restart: unless-stopped
+    network_mode: host
     volumes:
       - asterisk-spool:/var/spool/asterisk
     environment:
@@ -104,8 +105,6 @@ services:
       AMI_USER: ${AMI_USER}
       AMI_PASS: ${AMI_PASS}
       SIP_REALM: ${SIP_REALM}
-    networks:
-      - sip-private
 
   fail2ban:
     image: crazymax/fail2ban:latest
